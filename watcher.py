@@ -161,8 +161,8 @@ def send_email(item: dict) -> None:
             smtp.send_message(msg)             # send the email
         log.info(f'  Alert email sent to {NOTIFY_EMAIL} for "{name}".')
 
-    except smtplib.SMTPException as e:
-        log.error(f'  Failed to send email for "{name}": {e}')
+    except Exception as e:
+        log.warning(f'  Could not send email for "{name}": {e}')
 
 
 def send_sms(item: dict) -> None:
