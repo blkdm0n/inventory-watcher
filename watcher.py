@@ -151,14 +151,12 @@ def send_email(item: dict) -> None:
     )
 
     try:
-        # smtplib.SMTP opens a connection to the mail server.
-        # SMTP_SSL would encrypt from the start; plain SMTP + starttls() upgrades
-        # an unencrypted connection to an encrypted one (standard for port 587).
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
-            smtp.ehlo()       # introduce ourselves to the server
-            smtp.starttls()   # upgrade to encrypted connection
-            smtp.login(SMTP_USER, SMTP_PASS)   # authenticate
-            smtp.send_message(msg)             # send the email
+        # smtplib.SMTP_SSL opens an encrypted connection from the start (port 465).
+        # This is more reliable than STARTTLS (port 587) in restricted environments
+        # like GitHub Actions which often block outbound port 587.
+        with smtplib.SMTP_SSL(SMTP_HOST, 465) as smtp:
+            smtp.login(SMTP_USER, SMTP_PASS)
+            smtp.send_message(msg)
         log.info(f'  Alert email sent to {NOTIFY_EMAIL} for "{name}".')
 
     except Exception as e:
