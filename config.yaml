@@ -1,0 +1,19 @@
+# How often to fetch each product page (in minutes).
+# Lower = more frequent checks, but be respectful to the website's servers.
+check_interval_minutes: 5
+
+# List of products to watch.
+# Add as many items as you like by copying the block below.
+items:
+  - name: "AMP Drive-By-Wire Controller (DIYAutoTune)"
+    url: "https://diyautotune.com/products/amp-drive-by-wire-controller"
+    # Standard Shopify add-to-cart button selector.
+    # When sold out, Shopify changes this button text to "Sold out".
+    in_stock_selector: "button[name='add']"
+    in_stock_text: "Add to cart"
+
+  - name: "HDE Product (hdeproducts.com)"
+    url: "https://www.hdeproducts.com/shop"
+    # This site shows "CHECK BACK SOON" when out of stock.
+    # In-stock = that phrase is gone from the page.
+    out_of_stock_text: "CHECK BACK SOON"
