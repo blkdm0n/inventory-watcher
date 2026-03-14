@@ -14,11 +14,11 @@ import argparse     # parse --once command-line flag
 from email.message import EmailMessage  # builds a properly formatted email
 
 # ── Third-party imports (installed via requirements.txt) ──────────────────────
+import requests                         # send ntfy.sh push notifications
 import yaml                             # parse config.yaml
 import schedule                         # run a function on a timer
 from playwright.sync_api import sync_playwright  # headless browser for JS-rendered pages
 from dotenv import load_dotenv          # load .env file into os.environ
-from twilio.rest import Client as TwilioClient  # Twilio SMS
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
 # This makes every print-style message include a timestamp, e.g.:
@@ -41,12 +41,10 @@ SMTP_USER     = os.getenv("SMTP_USER")   # sender email address
 SMTP_PASS     = os.getenv("SMTP_PASS")   # sender email password / app password
 NOTIFY_EMAIL  = os.getenv("NOTIFY_EMAIL")  # recipient email address
 
-# ── Twilio SMS (optional) ─────────────────────────────────────────────────────
-# If any of these are missing, SMS is silently skipped and only email is sent.
-TWILIO_SID    = os.getenv("TWILIO_SID")
-TWILIO_TOKEN  = os.getenv("TWILIO_TOKEN")
-TWILIO_FROM   = os.getenv("TWILIO_FROM")   # your Twilio phone number e.g. +15005550006
-TWILIO_TO     = os.getenv("TWILIO_TO")     # your real phone number e.g. +14085550001
+# ── ntfy.sh push notifications (optional) ────────────────────────────────────
+# If missing, push notifications are silently skipped.
+# Sign up at ntfy.sh, install the app, and subscribe to your topic.
+NTFY_TOPIC    = os.getenv("NTFY_TOPIC")    # e.g. bldm0n-inventory-watcher-x7k2
 
 # ── Load config.yaml ──────────────────────────────────────────────────────────
 # yaml.safe_load() turns the YAML file into a plain Python dictionary.
@@ -163,26 +161,33 @@ def send_email(item: dict) -> None:
         log.warning(f'  Could not send email for "{name}": {e}')
 
 
-def send_sms(item: dict) -> None:
+def send_ntfy(item: dict) -> None:
     """
-    Send an SMS alert via Twilio. Skipped silently if Twilio credentials are not set.
+    Send a push notification via ntfy.sh. Skipped silently if NTFY_TOPIC is not set.
+    Install the free ntfy app and subscribe to your topic to receive alerts.
     """
-    if not all([TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM, TWILIO_TO]):
+    if not NTFY_TOPIC:
         return
 
     name = item["name"]
     url  = item["url"]
 
     try:
-        client = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
-        client.messages.create(
-            to=TWILIO_TO,
-            from_=TWILIO_FROM,
-            body=f"[Inventory Watcher] {name} is IN STOCK!\n{url}",
+        response = requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            headers={
+                "Title": f"{name} is IN STOCK!",
+                "Priority": "high",
+                "Tags": "shopping,tada",
+                "Click": url,
+            },
+            data=f"Go buy it before it's gone!\n{url}",
+            timeout=10,
         )
-        log.info(f'  SMS alert sent to {TWILIO_TO} for "{name}".')
+        response.raise_for_status()
+        log.info(f'  ntfy push notification sent for "{name}".')
     except Exception as e:
-        log.error(f'  Failed to send SMS for "{name}": {e}')
+        log.error(f'  Failed to send ntfy notification for "{name}": {e}')
 
 
 def run_checks() -> None:
@@ -197,7 +202,7 @@ def run_checks() -> None:
         if in_stock and name not in already_notified:
             # Item is in stock and we haven't alerted about it yet → send alerts
             send_email(item)
-            send_sms(item)
+            send_ntfy(item)
             already_notified.add(name)  # remember we already notified for this item
 
         elif not in_stock and name in already_notified:

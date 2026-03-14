@@ -16,10 +16,7 @@ jobs:
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASS: ${{ secrets.SMTP_PASS }}
       NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
-      TWILIO_SID: ${{ secrets.TWILIO_SID }}
-      TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
-      TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
-      TWILIO_TO: ${{ secrets.TWILIO_TO }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
 
     steps:
       - name: Checkout repo
