@@ -1,0 +1,10 @@
+# Your real credentials — NEVER commit this
+.env
+
+# Python bytecode cache (auto-generated, not needed in Git)
+__pycache__/
+*.pyc
+
+# Virtual environment folder (if you use one)
+venv/
+.venv/
