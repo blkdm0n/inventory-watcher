@@ -16,4 +16,4 @@ items:
     url: "https://www.hdeproducts.com/shop"
     # This site shows "CHECK BACK SOON" when out of stock.
     # In-stock = that phrase is gone from the page.
-    out_of_stock_text: "XYZNOTFOUND"
+    out_of_stock_text: "CHECK BACK SOON"

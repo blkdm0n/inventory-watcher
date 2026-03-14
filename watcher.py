@@ -8,10 +8,8 @@ Stop with: Ctrl+C
 # ── Standard-library imports ──────────────────────────────────────────────────
 import os           # read environment variables loaded from .env
 import time         # pause the script between scheduler ticks
-import smtplib      # built-in Python library for sending email over SMTP
 import logging      # write timestamped messages to the console
 import argparse     # parse --once command-line flag
-from email.message import EmailMessage  # builds a properly formatted email
 
 # ── Third-party imports (installed via requirements.txt) ──────────────────────
 import requests                         # send ntfy.sh push notifications
@@ -35,16 +33,7 @@ log = logging.getLogger(__name__)
 # process's environment variables, so os.getenv() can access them.
 load_dotenv()
 
-SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER     = os.getenv("SMTP_USER")   # sender email address
-SMTP_PASS     = os.getenv("SMTP_PASS")   # sender email password / app password
-NOTIFY_EMAIL  = os.getenv("NOTIFY_EMAIL")  # recipient email address
-
-# ── ntfy.sh push notifications (optional) ────────────────────────────────────
-# If missing, push notifications are silently skipped.
-# Sign up at ntfy.sh, install the app, and subscribe to your topic.
-NTFY_TOPIC    = os.getenv("NTFY_TOPIC")    # e.g. bldm0n-inventory-watcher-x7k2
+NTFY_TOPIC    = os.getenv("NTFY_TOPIC")    # e.g. blkdm0n-inventory-watcher-x7k2
 
 # ── Load config.yaml ──────────────────────────────────────────────────────────
 # yaml.safe_load() turns the YAML file into a plain Python dictionary.
@@ -58,7 +47,7 @@ ITEMS          = config.get("items", [])
 
 # ── State tracking ────────────────────────────────────────────────────────────
 # A Python "set" is like a list but with no duplicates and fast lookups.
-# We store item names here after we've sent an alert so we don't email again
+# We store item names here after we've sent an alert so we don't notify again
 # until the item goes out of stock and comes back in.
 already_notified = set()
 
@@ -125,42 +114,6 @@ def check_stock(item: dict) -> bool:
         return False
 
 
-def send_email(item: dict) -> None:
-    """
-    Send an email alert saying the item is in stock.
-
-    Uses Python's built-in smtplib — no third-party email service needed.
-    """
-    name = item["name"]
-    url  = item["url"]
-
-    # EmailMessage is a standard-library class that builds a properly formatted
-    # email with headers (To, From, Subject) and a body.
-    msg = EmailMessage()
-    msg["Subject"] = f"[Inventory Watcher] {name} is IN STOCK!"
-    msg["From"]    = SMTP_USER
-    msg["To"]      = NOTIFY_EMAIL
-    msg.set_content(
-        f"Good news! The item you're watching is back in stock.\n\n"
-        f"Product : {name}\n"
-        f"Link    : {url}\n\n"
-        f"Go buy it before it's gone!\n\n"
-        f"— Inventory Watcher"
-    )
-
-    try:
-        # smtplib.SMTP_SSL opens an encrypted connection from the start (port 465).
-        # This is more reliable than STARTTLS (port 587) in restricted environments
-        # like GitHub Actions which often block outbound port 587.
-        with smtplib.SMTP_SSL(SMTP_HOST, 465) as smtp:
-            smtp.login(SMTP_USER, SMTP_PASS)
-            smtp.send_message(msg)
-        log.info(f'  Alert email sent to {NOTIFY_EMAIL} for "{name}".')
-
-    except Exception as e:
-        log.warning(f'  Could not send email for "{name}": {e}')
-
-
 def send_ntfy(item: dict) -> None:
     """
     Send a push notification via ntfy.sh. Skipped silently if NTFY_TOPIC is not set.
@@ -200,13 +153,12 @@ def run_checks() -> None:
         in_stock = check_stock(item)
 
         if in_stock and name not in already_notified:
-            # Item is in stock and we haven't alerted about it yet → send alerts
-            send_email(item)
+            # Item is in stock and we haven't alerted about it yet → send notification
             send_ntfy(item)
             already_notified.add(name)  # remember we already notified for this item
 
         elif not in_stock and name in already_notified:
-            # Item went back out of stock → reset so we'll email again next time
+            # Item went back out of stock → reset so we'll notify again next time
             log.info(f'  "{name}" is back out of stock. Will notify again if it returns.')
             already_notified.discard(name)
 
@@ -222,11 +174,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Validate that credentials were loaded — fail early with a clear message
-    # rather than crashing later with a confusing smtplib error.
-    if not all([SMTP_USER, SMTP_PASS, NOTIFY_EMAIL]):
+    if not NTFY_TOPIC:
         raise SystemExit(
-            "ERROR: SMTP_USER, SMTP_PASS, and NOTIFY_EMAIL must be set in your .env file."
+            "ERROR: NTFY_TOPIC must be set in your .env file."
         )
 
     if args.once:
