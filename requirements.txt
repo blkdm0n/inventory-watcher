@@ -2,3 +2,4 @@ playwright>=1.43.0
 pyyaml>=6.0.1
 python-dotenv>=1.0.0
 schedule>=1.2.1
+twilio>=8.0.0

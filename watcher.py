@@ -18,6 +18,7 @@ import yaml                             # parse config.yaml
 import schedule                         # run a function on a timer
 from playwright.sync_api import sync_playwright  # headless browser for JS-rendered pages
 from dotenv import load_dotenv          # load .env file into os.environ
+from twilio.rest import Client as TwilioClient  # Twilio SMS
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
 # This makes every print-style message include a timestamp, e.g.:
@@ -39,6 +40,13 @@ SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER     = os.getenv("SMTP_USER")   # sender email address
 SMTP_PASS     = os.getenv("SMTP_PASS")   # sender email password / app password
 NOTIFY_EMAIL  = os.getenv("NOTIFY_EMAIL")  # recipient email address
+
+# ── Twilio SMS (optional) ─────────────────────────────────────────────────────
+# If any of these are missing, SMS is silently skipped and only email is sent.
+TWILIO_SID    = os.getenv("TWILIO_SID")
+TWILIO_TOKEN  = os.getenv("TWILIO_TOKEN")
+TWILIO_FROM   = os.getenv("TWILIO_FROM")   # your Twilio phone number e.g. +15005550006
+TWILIO_TO     = os.getenv("TWILIO_TO")     # your real phone number e.g. +14085550001
 
 # ── Load config.yaml ──────────────────────────────────────────────────────────
 # yaml.safe_load() turns the YAML file into a plain Python dictionary.
@@ -157,6 +165,28 @@ def send_email(item: dict) -> None:
         log.error(f'  Failed to send email for "{name}": {e}')
 
 
+def send_sms(item: dict) -> None:
+    """
+    Send an SMS alert via Twilio. Skipped silently if Twilio credentials are not set.
+    """
+    if not all([TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM, TWILIO_TO]):
+        return
+
+    name = item["name"]
+    url  = item["url"]
+
+    try:
+        client = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
+        client.messages.create(
+            to=TWILIO_TO,
+            from_=TWILIO_FROM,
+            body=f"[Inventory Watcher] {name} is IN STOCK!\n{url}",
+        )
+        log.info(f'  SMS alert sent to {TWILIO_TO} for "{name}".')
+    except Exception as e:
+        log.error(f'  Failed to send SMS for "{name}": {e}')
+
+
 def run_checks() -> None:
     """
     Loop through every item in config.yaml and check its stock status.
@@ -167,8 +197,9 @@ def run_checks() -> None:
         in_stock = check_stock(item)
 
         if in_stock and name not in already_notified:
-            # Item is in stock and we haven't emailed about it yet → send alert
+            # Item is in stock and we haven't alerted about it yet → send alerts
             send_email(item)
+            send_sms(item)
             already_notified.add(name)  # remember we already notified for this item
 
         elif not in_stock and name in already_notified:
